@@ -22,7 +22,7 @@ static void net_server_thread_entey(void *parameter)
     int sfd, cfd, maxfd, i, nready, n,result;
     struct sockaddr_in server_addr, client_addr;
     struct netdev *netdev = RT_NULL;
-    char sendbuff[] = "Hello client!";
+    char sendbuff[] = "Hello client! recved your data\r\n";
     socklen_t client_addr_len;
     fd_set all_set, read_set;
 
@@ -169,7 +169,6 @@ static void net_server_thread_entey(void *parameter)
                 }
             }
         }
-        rt_thread_mdelay(20);
     }
 }
 
@@ -227,13 +226,13 @@ static void net_write_entry(void *parameter)
                 write(fd,Recv_buf,sizeof(Recv_buf));//目前只能刷新一次，可以考虑sync和环形缓冲区
                 dis = lseek(fd, 0, SEEK_CUR);
 
-                //fsync(fd);
+                fsync(fd);
                 //close(fd);
                 rt_kprintf("Write done\r\n");
                 rt_kprintf("current write pos is:%d\r\n",dis);
             }
         }
-        rt_thread_mdelay(20);
+        //rt_thread_mdelay(20);
     }
 }
 
