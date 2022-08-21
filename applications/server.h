@@ -32,7 +32,7 @@
 
 #define RECV_EVENT (0x01 << 0)//事件掩码位0
  extern rt_event_t net_event;
- extern char Recv_buf[64];//接收到的网络数据
+
 
 
 

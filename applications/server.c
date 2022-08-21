@@ -14,7 +14,7 @@
 
 rt_thread_t thread = RT_NULL;
  rt_event_t net_event;
- char Recv_buf[64];//接收到的网络数据
+ static char Recv_buf[64];//接收到的网络数据
  static char recvbuff[BUFF_SIZE];
 
 static void net_server_thread_entey(void *parameter)
@@ -205,8 +205,9 @@ static void net_write_entry(void *parameter)
     //char buf[20];
     int fd;
     rt_uint32_t recv;
+    off_t dis = 0;
 
-    fd = open("/net_read.txt", O_WRONLY | O_CREAT);
+    fd = open("/net_read.txt", O_WRONLY | O_CREAT | O_APPEND);
     if(fd >= 0)
     {
         rt_kprintf("create file sucees\r\n");
@@ -223,12 +224,16 @@ static void net_write_entry(void *parameter)
         {
             if(fd >= 0)
             {
-                write(fd,Recv_buf,sizeof(Recv_buf));
+                write(fd,Recv_buf,sizeof(Recv_buf));//目前只能刷新一次，可以考虑sync和环形缓冲区
+                dis = lseek(fd, 0, SEEK_CUR);
+
+                //fsync(fd);
                 //close(fd);
                 rt_kprintf("Write done\r\n");
+                rt_kprintf("current write pos is:%d\r\n",dis);
             }
         }
-        rt_thread_mdelay(500);
+        rt_thread_mdelay(20);
     }
 }
 
