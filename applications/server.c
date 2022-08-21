@@ -7,32 +7,16 @@
  * Date           Author       Notes
  * 2022-08-13     zm       the first version
  */
+#include "server.h"
 #include <rtthread.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netdev.h>
-#include <stdio.h>
-#include <string.h>
-//#include <select.h>
-
-#define SERVER_PORT 8888
-#define BUFF_SIZE 1024
-
-static char recvbuff[BUFF_SIZE];
-#include <rtthread.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netdev.h>
-#include <stdio.h>
-#include <string.h>
-#define SERVER_PORT   8888
-#define BUFF_SIZE 1024
+#include <dfs_posix.h>
 
 
- rt_uint8_t msg_pool[2048];
-rt_mq_t mq1 = RT_NULL;
+rt_thread_t thread = RT_NULL;
+ rt_event_t net_event;
+ char Recv_buf[64];//接收到的网络数据
+ static char recvbuff[BUFF_SIZE];
 
-static char recvbuff[BUFF_SIZE];
 static void net_server_thread_entey(void *parameter)
 {
     int sfd, cfd, maxfd, i, nready, n,result;
@@ -42,15 +26,14 @@ static void net_server_thread_entey(void *parameter)
     socklen_t client_addr_len;
     fd_set all_set, read_set;
 
-    mq1 = rt_mq_create("write_mq", 20, 20, RT_IPC_FLAG_FIFO);
-    //result = rt_mq_create("write_mq", 8, sizeof(msg_pool), flag)(&mq1, "write_mq", &msg_pool[0], 8, sizeof(msg_pool), RT_IPC_FLAG_PRIO);
-    if(mq1 != RT_NULL)
-    {rt_kprintf("消息队列创建成功\r\n");}
-    else {
-        rt_kprintf("消息队列创建失败\r\n");
-    }
+    net_event = rt_event_create("net_event", RT_IPC_FLAG_FIFO);
+       if(net_event != RT_NULL)
+       {rt_kprintf("net事件创建成功\r\n");}
+       else {
+           rt_kprintf("net事件创建失败\r\n");
+       }
 
-    rt_kprintf("init message queue success\r\n");
+
     //FD_SETSIZE里面包含了服务器的fd
     int clientfds[FD_SETSIZE - 1];
     /* 通过名称获取 netdev 网卡对象 */
@@ -155,11 +138,15 @@ static void net_server_thread_entey(void *parameter)
             {
                 n = recv(clientfds[i],recvbuff, sizeof(recvbuff), 0);
                 rt_kprintf("clientfd %d:  %s \r\n",clientfds[i], recvbuff);
-                result = rt_mq_send(mq1, recvbuff, sizeof(recvbuff));
+                strcpy(Recv_buf,recvbuff);
+                result = rt_event_send(net_event, RECV_EVENT);
                 if(result != RT_EOK)
                 {
-                    rt_kprintf("send msg error\r\n");
+                    rt_kprintf("send event error\r\n");
                     rt_kprintf("error code is%d",result);
+                }
+                else {
+                    rt_kprintf("send event success\r\n");
                 }
 
                 if(n <= 0)
@@ -182,19 +169,23 @@ static void net_server_thread_entey(void *parameter)
                 }
             }
         }
-        rt_thread_mdelay(500);
+        rt_thread_mdelay(20);
     }
 }
 
 static int server(int argc,char **argv)
 {
     rt_err_t ret = RT_EOK;
+    rt_kprintf("enter server\r\n");
     if(argc != 2)
     {
         rt_kprintf("bind test[netdev_name] -- bind network interface device by name\n");
         return -RT_ERROR;
     }
-   rt_thread_t  thread = rt_thread_create("server", net_server_thread_entey, argv[1], 4096, 10, 10);
+    else {
+        rt_kprintf("enter error pealse try again\r\n");
+    }
+   rt_thread_t  thread = rt_thread_create("server", net_server_thread_entey, argv[1], 1024, 10, 10);
 
    if(thread != RT_NULL)
    {
@@ -205,6 +196,57 @@ static int server(int argc,char **argv)
    }
    return ret;
 }
+
+
+
+static void net_write_entry(void *parameter)
+{
+    rt_kprintf("net_write_entry\r\n");
+    //char buf[20];
+    int fd;
+    rt_uint32_t recv;
+
+    fd = open("/net_read.txt", O_WRONLY | O_CREAT);
+    if(fd >= 0)
+    {
+        rt_kprintf("create file sucees\r\n");
+
+    }
+    else {
+        rt_kprintf("create file failed\r\n");
+    }
+
+    while(1)
+    {
+        rt_event_recv(net_event, RECV_EVENT, RT_EVENT_FLAG_CLEAR | RT_EVENT_FLAG_AND, RT_WAITING_FOREVER, &recv);
+        if(recv == RECV_EVENT)
+        {
+            if(fd >= 0)
+            {
+                write(fd,Recv_buf,sizeof(Recv_buf));
+                //close(fd);
+                rt_kprintf("Write done\r\n");
+            }
+        }
+        rt_thread_mdelay(500);
+    }
+}
+
+int file_read_start(void)
+{
+    rt_err_t ret;
+    thread = rt_thread_create("thread_fileread", net_write_entry, RT_NULL, 1024, 11, 20);
+    if(thread != RT_NULL)
+    {
+        rt_thread_startup(thread);
+        return RT_EOK;
+    }
+    else {
+        ret  = RT_ERROR;
+    }
+    return ret;
+}
+MSH_CMD_EXPORT(file_read_start,net file read to txt);
 #ifdef FINSH_USING_MSH
 #include <finsh.h>
 MSH_CMD_EXPORT(server,network interface device test);
