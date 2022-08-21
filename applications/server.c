@@ -138,7 +138,9 @@ static void net_server_thread_entey(void *parameter)
             {
                 n = recv(clientfds[i],recvbuff, sizeof(recvbuff), 0);
                 rt_kprintf("clientfd %d:  %s \r\n",clientfds[i], recvbuff);
+                //sprintf(Recv_buf,"clientfd %d:",clientfds[i]);
                 strcpy(Recv_buf,recvbuff);
+                memset(recvbuff,0,sizeof(recvbuff));
                 result = rt_event_send(net_event, RECV_EVENT);
                 if(result != RT_EOK)
                 {
@@ -223,7 +225,8 @@ static void net_write_entry(void *parameter)
         {
             if(fd >= 0)
             {
-                write(fd,Recv_buf,sizeof(Recv_buf));//目前只能刷新一次，可以考虑sync和环形缓冲区
+                write(fd,Recv_buf,strlen(Recv_buf));//环形缓冲区失败，可能是内存不够？无法创建文件
+                write(fd, "\r\n", strlen("\r\n"));
                 dis = lseek(fd, 0, SEEK_CUR);
 
                 fsync(fd);
@@ -232,7 +235,7 @@ static void net_write_entry(void *parameter)
                 rt_kprintf("current write pos is:%d\r\n",dis);
             }
         }
-        //rt_thread_mdelay(20);
+
     }
 }
 
