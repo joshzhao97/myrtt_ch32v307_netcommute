@@ -19,7 +19,7 @@
 //#include <select.h>
 
 #define SERVER_PORT 8888
-#define BUFF_SIZE 64
+#define BUFF_SIZE 63
 
 
 #include <rtthread.h>
@@ -31,6 +31,7 @@
 
 
 #define RECV_EVENT (0x01 << 0)//事件掩码位0
+#define WRITE_EVENT (0x01 << 1)//写
  extern rt_event_t net_event;
 
 

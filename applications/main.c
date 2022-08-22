@@ -79,14 +79,6 @@ int main(void)
     rt_kprintf("www.wch.cn\n");
 	LED1_BLINK_INIT();
 
-	GPIO_ResetBits(GPIOA,GPIO_Pin_0);
-	while(1)
-	{
-	    GPIO_SetBits(GPIOA,GPIO_Pin_0);
-	    rt_thread_mdelay(500);
-	    GPIO_ResetBits(GPIOA,GPIO_Pin_0);
-	    rt_thread_mdelay(500);
-	}
 }
 
 
@@ -97,24 +89,6 @@ int main(void)
  *
  * @return  none
  */
-int led(void)
-{
-    rt_uint8_t count;
-
-    rt_pin_mode(LED0_PIN, PIN_MODE_OUTPUT);
-    rt_kprintf("led_SP:%08x\r\n",__get_SP());
-    for(count = 0 ; count < 10 ;count++)
-    {
-        rt_pin_write(LED0_PIN, PIN_LOW);
-        rt_kprintf("led on, count : %d\r\n", count);
-        rt_thread_mdelay(500);
-
-        rt_pin_write(LED0_PIN, PIN_HIGH);
-        rt_kprintf("led off\r\n");
-        rt_thread_mdelay(500);
-    }
-    return 0;
-}
 
 int sd_start(void)
 {
@@ -149,7 +123,6 @@ static int rt_hw_spi1_tfcard(void)
 
 INIT_DEVICE_EXPORT(rt_hw_spi1_tfcard);
 
-MSH_CMD_EXPORT(led,  led sample by using I/O drivers);
 MSH_CMD_EXPORT(sd_start,  start sd thread);
 
 

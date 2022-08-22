@@ -14,25 +14,53 @@
 
 rt_thread_t thread = RT_NULL;
  rt_event_t net_event;
- static char Recv_buf[64];//接收到的网络数据
+ static int client_info;//客户端编号
+ static char Recv_buf[63];//接收到的网络数据
+
  static char recvbuff[BUFF_SIZE];
+ const static char sendbuff[] = "Hello client!";
+
+ static void data_proc_entry(void *parameter)
+ {
+     rt_uint32_t recv = 0;
+     int result = 0;
+     static char ip[2];
+     net_event = rt_event_create("net_event", RT_IPC_FLAG_FIFO);
+        if(net_event != RT_NULL)
+        {rt_kprintf("net事件创建成功\r\n");}
+        else {
+            rt_kprintf("net事件创建失败\r\n");
+        }
+
+
+     while(1)
+     {
+         rt_event_recv(net_event, RECV_EVENT, RT_EVENT_FLAG_CLEAR | RT_EVENT_FLAG_AND, RT_WAITING_FOREVER, &recv);
+         if(recv == RECV_EVENT)
+         {
+             //rt_kprintf("test1\r\n");
+             strncat(Recv_buf,"by client:",sizeof("by client:"));
+             itoa(client_info,ip,10);
+             strncat(Recv_buf,ip,sizeof(ip));
+             //sprintf(Recv_buf,"says by:%d\r\n",client_info);
+             result = rt_event_send(net_event, WRITE_EVENT);
+             if(result == RT_EOK)
+             {
+                  rt_kprintf("send event success\r\n");
+             }
+         }
+     }
+ }
 
 static void net_server_thread_entey(void *parameter)
 {
-    int sfd, cfd, maxfd, i, nready, n,result;
+    int sfd, cfd, maxfd, i, nready, n;
     struct sockaddr_in server_addr, client_addr;
     struct netdev *netdev = RT_NULL;
-    char sendbuff[] = "Hello client! recved your data\r\n";
+
     socklen_t client_addr_len;
     fd_set all_set, read_set;
-
-    net_event = rt_event_create("net_event", RT_IPC_FLAG_FIFO);
-       if(net_event != RT_NULL)
-       {rt_kprintf("net事件创建成功\r\n");}
-       else {
-           rt_kprintf("net事件创建失败\r\n");
-       }
-
+    //rt_uint32_t recv_flag = 0;
 
     //FD_SETSIZE里面包含了服务器的fd
     int clientfds[FD_SETSIZE - 1];
@@ -86,7 +114,9 @@ static void net_server_thread_entey(void *parameter)
         //每次select返回之后，fd_set集合就会变化，再select时，就不能使用，
         //所以我们要保存设置fd_set 和 读取的fd_set
         read_set = all_set;
+        rt_kprintf("enter select before\r\n");//test
         nready = select(maxfd + 1,&read_set, NULL, NULL, NULL);
+        rt_kprintf("enter select after\r\n");//test
         //没有超时机制，不会返回0
         if(nready < 0)
         {
@@ -138,19 +168,21 @@ static void net_server_thread_entey(void *parameter)
             {
                 n = recv(clientfds[i],recvbuff, sizeof(recvbuff), 0);
                 rt_kprintf("clientfd %d:  %s \r\n",clientfds[i], recvbuff);
-                //sprintf(Recv_buf,"clientfd %d:",clientfds[i]);
+                client_info = clientfds[i];
                 strcpy(Recv_buf,recvbuff);
                 memset(recvbuff,0,sizeof(recvbuff));
-                result = rt_event_send(net_event, RECV_EVENT);
-                if(result != RT_EOK)
-                {
-                    rt_kprintf("send event error\r\n");
-                    rt_kprintf("error code is%d",result);
-                }
-                else {
-                    rt_kprintf("send event success\r\n");
-                }
 
+
+                /*sprintf(Recv_buf,"clientfd %d:",clientfds[i]);
+                strcat(Recv_buf,recvbuff);
+                memset(recvbuff,0,sizeof(recvbuff));
+                result = rt_event_send(net_event, RECV_EVENT);
+                if(result == RT_EOK)
+                {
+                    rt_kprintf("send event success\r\n");
+                  while(rt_event_recv(net_event, WRITE_EVENT, RT_EVENT_FLAG_CLEAR | RT_EVENT_FLAG_AND, RT_WAITING_FOREVER, &recv_flag) != RT_EOK);
+                }
+                */
                 if(n <= 0)
                 {
                     //从集合里面清除
@@ -160,7 +192,13 @@ static void net_server_thread_entey(void *parameter)
                 else
                 {
                     //写回客户端
-                    n = send(clientfds[i],sendbuff, strlen(sendbuff), 0);
+                    rt_kprintf("test4\r\n");
+
+                    n = send(clientfds[i],(char *)&sendbuff, strlen(sendbuff), 0);
+                    rt_kprintf("test3]\r\n");
+                    rt_event_send(net_event, RECV_EVENT);
+
+                    //rt_thread_mdelay(200);
                     if(n < 0)
                     {
                         //从集合里面清除
@@ -169,10 +207,14 @@ static void net_server_thread_entey(void *parameter)
                         clientfds[i] = -1;
                     }
                 }
+
             }
         }
+
     }
 }
+
+
 
 static int server(int argc,char **argv)
 {
@@ -184,9 +226,10 @@ static int server(int argc,char **argv)
         return -RT_ERROR;
     }
     else {
-        rt_kprintf("enter error pealse try again\r\n");
+        //rt_kprintf("enter error pealse try again\r\n");
     }
-   rt_thread_t  thread = rt_thread_create("server", net_server_thread_entey, argv[1], 1024, 10, 10);
+   rt_thread_t  thread = rt_thread_create("server", net_server_thread_entey, argv[1], 2048, 10, 10);
+   rt_thread_t thread2 = rt_thread_create("data_process", data_proc_entry, RT_NULL, 1024, 11, 20);
 
    if(thread != RT_NULL)
    {
@@ -195,6 +238,14 @@ static int server(int argc,char **argv)
    else {
     ret = RT_ERROR;
    }
+
+   if(thread2 != RT_NULL)
+     {
+         rt_thread_startup(thread2);
+     }
+     else {
+      ret = RT_ERROR;
+     }
    return ret;
 }
 
@@ -220,12 +271,13 @@ static void net_write_entry(void *parameter)
 
     while(1)
     {
-        rt_event_recv(net_event, RECV_EVENT, RT_EVENT_FLAG_CLEAR | RT_EVENT_FLAG_AND, RT_WAITING_FOREVER, &recv);
-        if(recv == RECV_EVENT)
+        rt_event_recv(net_event, WRITE_EVENT, RT_EVENT_FLAG_CLEAR | RT_EVENT_FLAG_AND, RT_WAITING_FOREVER, &recv);
+        if(recv == WRITE_EVENT)
         {
             if(fd >= 0)
             {
                 write(fd,Recv_buf,strlen(Recv_buf));//环形缓冲区失败，可能是内存不够？无法创建文件
+                //write(fd, &client_info, 1);
                 write(fd, "\r\n", strlen("\r\n"));
                 dis = lseek(fd, 0, SEEK_CUR);
 
@@ -242,7 +294,7 @@ static void net_write_entry(void *parameter)
 int file_read_start(void)
 {
     rt_err_t ret;
-    thread = rt_thread_create("thread_fileread", net_write_entry, RT_NULL, 1024, 11, 20);
+    thread = rt_thread_create("thread_fileread", net_write_entry, RT_NULL, 2048, 12, 20);
     if(thread != RT_NULL)
     {
         rt_thread_startup(thread);
