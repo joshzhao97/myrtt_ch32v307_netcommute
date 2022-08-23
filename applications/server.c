@@ -228,7 +228,7 @@ static int server(int argc,char **argv)
     else {
         //rt_kprintf("enter error pealse try again\r\n");
     }
-   rt_thread_t  thread = rt_thread_create("server", net_server_thread_entey, argv[1], 2048, 10, 10);
+   rt_thread_t  thread = rt_thread_create("server", net_server_thread_entey, argv[1], 4096, 10, 10);
    rt_thread_t thread2 = rt_thread_create("data_process", data_proc_entry, RT_NULL, 1024, 11, 20);
 
    if(thread != RT_NULL)
@@ -294,7 +294,7 @@ static void net_write_entry(void *parameter)
 int file_read_start(void)
 {
     rt_err_t ret;
-    thread = rt_thread_create("thread_fileread", net_write_entry, RT_NULL, 2048, 12, 20);
+    thread = rt_thread_create("thread_fileread", net_write_entry, RT_NULL, 4096, 12, 20);
     if(thread != RT_NULL)
     {
         rt_thread_startup(thread);

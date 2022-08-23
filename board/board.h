@@ -19,7 +19,7 @@
 #include "ch32v30x.h"
 
 /* board configuration */
-#define SRAM_SIZE  96
+#define SRAM_SIZE  128
 #define SRAM_END (0x20000000 + SRAM_SIZE * 1024)
 
 extern int _ebss;
